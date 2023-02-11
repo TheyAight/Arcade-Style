@@ -1,56 +1,103 @@
-import pygame
+import pygame, random, math, os
+from os import listdir
+from os.path import isfile, join
+pygame.init()
 
-WIDTH, HEIGHT = 900, 500
-WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("LEG DAY")
 
-WHITE = (255,255,255)
-BLUE = (0, 0, 225)
-GRAY = (220, 220, 220)
+BG_COLOR = (255, 255, 255)
+WIDTH, HEIGHT = 1000, 800
 
-BORDER = pygame.Rect(0, HEIGHT - 20, WIDTH, 30)
+FPS = 60 
+PLAYER_VEL = 5
 
-FPS = 60
-VEL = 10
+window = pygame.display.set_mode((WIDTH, HEIGHT))
 
-PWIDTH , PHEIGHT = 62, 62
+class Player(pygame.sprite.Sprite):
+    COLOR = (255, 0, 0)
+    
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.x_vel = 0
+        self.y_vel = 0
+        self.mask = None
+        self.direction = "left"
+        self.animation_count = 0
 
-PLAYER = pygame.image.load("assets/player.png")
-PLYR = pygame.transform.scale(PLAYER, (PWIDTH, PHEIGHT))
+    def move(self, dx, dy):
+        self.rect.x += dx
+        self.rect.y += dy
 
-def draw_window(play):
-    WINDOW.fill(GRAY)
-    pygame.draw.rect(WINDOW, BLUE, BORDER)
-    WINDOW.blit(PLYR, (play.x, play.y))
+    def move_left(self, vel):
+        self.x_vel = -vel
+        if self.direction != "left":
+            self.direction = "left"
+            self.animation_count = 0
+
+    def move_right(self, vel):
+        self.x_vel = vel
+        if self.direction != "right":
+            self.direction = "right"
+            self.animation_count = 0
+
+    def loop(self, fps):
+        self.move(self.x_vel, self.y_vel)
+    
+    def draw(self, win):
+        pygame.draw.rect(win, self.COLOR, self.rect)
+
+
+def get_background(name):
+    image = pygame.image.load(join("assets", name))
+    _, _, width, height = image.get_rect()
+    tiles = []
+
+    for i in range(WIDTH // width +1 ):
+        for j in range(HEIGHT // height + 1):
+            pos = (i * width, j * height)
+            tiles.append(pos)
+
+    return tiles, image
+
+def draw(window, background, bg_image, player):
+    for tile in background:
+        window.blit(bg_image, tile)
+
+    player.draw(window)
+    
+    
     pygame.display.update()
 
-def player_handle_movement(keys_pressed, play):
-    if keys_pressed[pygame.K_LEFT] and play.x - VEL + 13 > 0:
-        play.x -= VEL
-    if keys_pressed[pygame.K_RIGHT] and play.x + VEL + play.width - 12 < WIDTH:
-        play.x += VEL
-    if keys_pressed[pygame.K_UP] and play.y - VEL + 13 > 0:
-        play.y -= VEL
-    if keys_pressed[pygame.K_DOWN] and play.y + VEL + play.height - 12 < BORDER.y:
-        play.y += VEL
+def handle_move(player):
+    keys = pygame.key.get_pressed()
 
-def main():
-    play = pygame.Rect(100, 300, PWIDTH, PHEIGHT)
+    player.x_vel = 0
+    if keys[pygame.K_LEFT]:
+        player.move_left(PLAYER_VEL)
+    if keys[pygame.K_RIGHT]:
+        player.move_right(PLAYER_VEL)
 
+def main(window):
     clock = pygame.time.Clock()
+    background, bg_image = get_background("tile gray.png")
 
-    carryOn = True
-    while carryOn:
+    player = Player(100, 100, 64, 64)
+
+    run = True
+    while run:
         clock.tick(FPS)
+
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                carryOn = False
+                run = False
+                break
 
-        keys_pressed = pygame.key.get_pressed()
-        player_handle_movement(keys_pressed, play)
-        draw_window(play)
-
+        player.loop(FPS)
+        handle_move(player)
+        draw(window, background, bg_image, player)
     pygame.quit()
+    quit()
 
 if __name__ == "__main__":
-    main()
+    main(window)
