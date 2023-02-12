@@ -51,7 +51,7 @@ def get_block(size):
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     GRAVITY = 1
-    SPRITES = load_sprite_sheets("Characters", "legdude", 32, 32, True)
+    SPRITES = load_sprite_sheets("Characters", "Cyborg", 48, 48, True)
     ANIMATION_DELAY = 8
     
     def __init__(self, x, y, width, height):
@@ -107,14 +107,16 @@ class Player(pygame.sprite.Sprite):
     
 
     def update_sprite(self):
-        sprite_sheet = "idle"
+        sprite_sheet = "Cyborg_idle"
         if self.y_vel < 0:
             if self.jump_count == 1:
-                sprite_sheet = "jump" 
+                sprite_sheet = "Cyborg_jump" 
+            elif self.jump_count == 2:
+                sprite_sheet = "Cyborg_doublejump"
         elif self.y_vel > self.GRAVITY * 2:
-            sprite_sheet = "fall"
+            sprite_sheet = "Cyborg_idle"
         elif self.x_vel != 0:
-            sprite_sheet = "running"
+            sprite_sheet = "Cyborg_run"
 
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
@@ -205,7 +207,7 @@ def main(window):
     clock = pygame.time.Clock()
     background, bg_image = get_background("bckgrd.png")
 
-    block_size = 96
+    block_size = 32
 
     player = Player(100, 100, 64, 64)
     floor = [Block(i * block_size, HEIGHT - block_size, block_size)
