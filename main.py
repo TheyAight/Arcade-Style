@@ -3,10 +3,11 @@ from os import listdir
 from os.path import isfile, join
 pygame.init()
 
+WIDTH, HEIGHT = 1000, 800
+
 pygame.display.set_caption("LEG DAY")
 
 BG_COLOR = (255, 255, 255)
-WIDTH, HEIGHT = 1000, 800
 
 FPS = 60 
 PLAYER_VEL = 5
@@ -152,21 +153,8 @@ class Block(Object):
         self.image.blit(block, (0, 0))
         self.mask = pygame.mask.from_surface(self.image)
 
-def get_background(name):
-    image = pygame.image.load(join("assets", "Background", name))
-    _, _, width, height = image.get_rect()
-    tiles = []
-
-    for i in range(WIDTH // width +1 ):
-        for j in range(HEIGHT // height + 1):
-            pos = (i * width, j * height)
-            tiles.append(pos)
-
-    return tiles, image
-
-def draw(window, background, bg_image, player, objects,offset_x):
-    for tile in background:
-        window.blit(bg_image, tile)
+def draw(window, player, objects,offset_x):
+    
 
     for obj in objects:
         obj.draw(window, offset_x)
@@ -205,7 +193,6 @@ def handle_move(player, objects):
 
 def main(window):
     clock = pygame.time.Clock()
-    background, bg_image = get_background("bckgrd.png")
 
     block_size = 32
 
@@ -220,19 +207,18 @@ def main(window):
     while run:
         clock.tick(FPS)
 
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
                 break
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE and player.jump_count < 2:
+                if event.key == pygame.K_UP and player.jump_count < 2:
                     player.jump()
 
         player.loop(FPS)
         handle_move(player, floor)
-        draw(window, background, bg_image, player, floor, offset_x)
+        draw(window, player, floor, offset_x)
 
         if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
             (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
