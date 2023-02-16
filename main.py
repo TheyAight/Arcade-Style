@@ -3,7 +3,7 @@ from os import listdir
 from os.path import isfile, join
 pygame.init()
 
-WIDTH, HEIGHT = 1000, 800
+WIDTH, HEIGHT = 1400, 700
 
 pygame.display.set_caption("LEG DAY")
 
@@ -53,7 +53,7 @@ class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     GRAVITY = 1
     SPRITES = load_sprite_sheets("Characters", "Cyborg", 48, 48, True)
-    ANIMATION_DELAY = 8
+    ANIMATION_DELAY = 5
     
     def __init__(self, x, y, width, height):
         super().__init__()
@@ -115,7 +115,7 @@ class Player(pygame.sprite.Sprite):
             elif self.jump_count == 2:
                 sprite_sheet = "Cyborg_doublejump"
         elif self.y_vel > self.GRAVITY * 2:
-            sprite_sheet = "Cyborg_idle"
+            sprite_sheet = "Fall"
         elif self.x_vel != 0:
             sprite_sheet = "Cyborg_run"
 
@@ -183,16 +183,18 @@ def handle_move(player, objects):
     keys = pygame.key.get_pressed()
 
     player.x_vel = 0
-    if keys[pygame.K_LEFT]:
+    if keys[pygame.K_a]:
         player.move_left(PLAYER_VEL)
-    if keys[pygame.K_RIGHT]:
+    elif keys[pygame.K_d]:
         player.move_right(PLAYER_VEL)
+        
 
     handle_vertical_collison(player, objects, player.y_vel)
 
-
 def main(window):
     clock = pygame.time.Clock()
+
+    bg = pygame.image.load("assets/Background/background.jpg").convert()
 
     block_size = 32
 
@@ -207,13 +209,16 @@ def main(window):
     while run:
         clock.tick(FPS)
 
+       
+        window.blit(bg,(0,0))
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
                 break
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP and player.jump_count < 2:
+                if event.key == pygame.K_w and player.jump_count < 2:
                     player.jump()
 
         player.loop(FPS)
