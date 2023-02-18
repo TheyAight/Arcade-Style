@@ -1,16 +1,20 @@
 import pygame, random, math, os
 from os import listdir
 from os.path import isfile, join
+from pygame import mixer
 pygame.init()
 
-WIDTH, HEIGHT = 1400, 700
+WIDTH, HEIGHT = 1324, 745
 
 pygame.display.set_caption("LEG DAY")
+
+mixer.music.load('assets/Music/bgmusic.mp3')
+mixer.music.play(-1)
 
 BG_COLOR = (255, 255, 255)
 
 FPS = 60 
-PLAYER_VEL = 5
+PLAYER_VEL = 6
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -42,7 +46,7 @@ def load_sprite_sheets(dir1, dir2, width, height, direction=False):
     return all_sprites
 
 def get_block(size):
-    path = join("assets", "Terrain", "tile_33.png")
+    path = join("assets", "Terrain", "IndustrialTile_27.png")
     image = pygame.image.load(path).convert_alpha()
     surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
     rect = pygame.Rect(0, 0, size, size)
@@ -108,6 +112,7 @@ class Player(pygame.sprite.Sprite):
     
 
     def update_sprite(self):
+        keys = pygame.key.get_pressed()
         sprite_sheet = "Cyborg_idle"
         if self.y_vel < 0:
             if self.jump_count == 1:
@@ -118,6 +123,9 @@ class Player(pygame.sprite.Sprite):
             sprite_sheet = "Fall"
         elif self.x_vel != 0:
             sprite_sheet = "Cyborg_run"
+        elif keys [pygame.K_9]:
+            sprite_sheet = "Angry"
+        
 
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
@@ -177,16 +185,17 @@ def handle_vertical_collison(player, objects, dy):
         collided_objects.append(obj)
 
     return collided_objects
-            
 
-def handle_move(player, objects):
+def handle_move(player, objects, scroll):
     keys = pygame.key.get_pressed()
 
     player.x_vel = 0
-    if keys[pygame.K_a]:
+    if keys[pygame.K_a] and player.rect.x > 0:
         player.move_left(PLAYER_VEL)
-    elif keys[pygame.K_d]:
+        scroll -= 5
+    elif keys[pygame.K_d] and player.rect.x < 3000:
         player.move_right(PLAYER_VEL)
+        scroll += 5
         
 
     handle_vertical_collison(player, objects, player.y_vel)
@@ -194,24 +203,42 @@ def handle_move(player, objects):
 def main(window):
     clock = pygame.time.Clock()
 
-    bg = pygame.image.load("assets/Background/background.jpg").convert()
+    scroll = 0
+
+    bg_images = []
+    for i in range(1,7):
+        bg_image = pygame.image.load(f"assets/Background/city 6/bg-{i}.png").convert_alpha()
+        bg_image = pygame.transform.smoothscale(bg_image, (1324, 745))
+        bg_images.append(bg_image)
+    bg_width = bg_images[0].get_width()
+
+    def draw_bg():
+        for x in range(100):
+            speed = 1
+            for i in bg_images:
+                window.blit(i, ((x * bg_width) - scroll * speed, 0))
+                speed += .05
 
     block_size = 32
 
-    player = Player(100, 100, 64, 64)
-    floor = [Block(i * block_size, HEIGHT - block_size, block_size)
-              for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
+    floor_level = 100
+
+
+    player = Player(WIDTH / 2, HEIGHT - floor_level - 2, 64, 64)
+    floor = [Block(i * block_size, HEIGHT - floor_level, block_size)
+              for i in range(1000)]
+    
+    objects = [*floor]
     
     offset_x = 0
-    scroll_area_width = 200
+    scroll_area_width = 10
 
     run = True
     while run:
         clock.tick(FPS)
 
-       
-        window.blit(bg,(0,0))
-
+        draw_bg()
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
@@ -221,13 +248,17 @@ def main(window):
                 if event.key == pygame.K_w and player.jump_count < 2:
                     player.jump()
 
-        player.loop(FPS)
-        handle_move(player, floor)
-        draw(window, player, floor, offset_x)
 
-        if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
-            (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
+        player.loop(FPS)
+        handle_move(player, objects, scroll)
+        draw(window, player, objects, offset_x)
+
+        if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0 and scroll < 3000):
             offset_x += player.x_vel
+            scroll += 2
+        elif ((player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0 and scroll > 0):
+            offset_x += player.x_vel
+            scroll -= 2
 
     pygame.quit()
     quit()
