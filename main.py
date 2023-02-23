@@ -171,6 +171,35 @@ class Block(Object):
         self.image.blit(block, (0, 0))
         self.mask = pygame.mask.from_surface(self.image)
 
+class Enemy(Object):
+    ANIMATION_DELAY = 3
+    def __init__(self, x, y, width, height):
+        super().__init__(x, y, width, height, "enemy")
+        self.enemy = load_sprite_sheets("Characters", "Enemy", width, height)
+        self.image = self.enemy["Punk_idle"][0]
+        self.mask = pygame.mask.from_surface(self.image)
+        self.animation_count = 0
+        self.animation_name = "Punk_idle"
+
+    def walk(self):
+        self.animation_name = "Walk"
+
+    def idle(self):
+        self.animation_name = "Punk_idle"
+
+    def loop(self):
+        sprites = self.enemy[self.animation_name]
+        sprite_index = (self.animation_count // 
+                        self.ANIMATION_DELAY) % len(sprites)
+        self.image = sprites[sprite_index]
+        self.animation_count += 1
+
+        self.rect = self.image.get_rect(topleft=(self.rect.x, self.rect.y))
+        self.mask = pygame.mask.from_surface(self.image)
+
+        if self.animation_count // self.ANIMATION_DELAY > len(sprites):
+            self.animation_count = 0
+
 def draw(window, player, objects,offset_x):
     
 
@@ -235,11 +264,13 @@ def main(window):
     floor_level = 100
 
 
-    player = Player(WIDTH / 2, HEIGHT - floor_level - 2, 64, 64)
+    player = Player(WIDTH / 2, HEIGHT - floor_level - 2, 48, 48)
+    enemy = Enemy(100, HEIGHT - floor_level - 98 - 2, 48, 48)
+    enemy.idle()
     floor = [Block(i * block_size, HEIGHT - floor_level, block_size)
               for i in range(1000)]
     
-    objects = [*floor]
+    objects = [*floor, enemy]
     
     offset_x = 0
     scroll_area_width = 10
@@ -260,6 +291,7 @@ def main(window):
                     player.jump()
 
         player.loop(FPS)
+        enemy.loop()
         handle_move(player, objects, scroll)
         draw(window, player, objects, offset_x)
 
