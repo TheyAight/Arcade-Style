@@ -117,14 +117,24 @@ class Player(pygame.sprite.Sprite):
         if self.y_vel < 0:
             if self.jump_count == 1:
                 sprite_sheet = "Cyborg_jump" 
+                path = join('assets', 'SFX', 'jump.wav')
+                impact = mixer.Sound(path)
+                impact.play()
             elif self.jump_count == 2:
                 sprite_sheet = "Cyborg_doublejump"
+                path = join('assets', 'SFX', 'jump.wav')
+                impact = mixer.Sound(path)
+                impact.play()
         elif self.y_vel > self.GRAVITY * 2:
             sprite_sheet = "Fall"
         elif self.x_vel != 0:
             sprite_sheet = "Cyborg_run"
         elif keys [pygame.K_9]:
             sprite_sheet = "Angry"
+        elif keys [pygame.K_k]:
+            sprite_sheet = "Cyborg_punch"
+        elif keys [pygame.K_j]:
+            sprite_sheet = "Cyborg_attack3"
         
 
         sprite_sheet_name = sprite_sheet + "_" + self.direction
@@ -200,6 +210,7 @@ def handle_move(player, objects, scroll):
 
     handle_vertical_collison(player, objects, player.y_vel)
 
+
 def main(window):
     clock = pygame.time.Clock()
 
@@ -247,7 +258,6 @@ def main(window):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_w and player.jump_count < 2:
                     player.jump()
-
 
         player.loop(FPS)
         handle_move(player, objects, scroll)
