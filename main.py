@@ -53,6 +53,14 @@ def get_block(size):
     surface.blit(image, (0,0), rect)
     return pygame.transform.scale2x(surface)
 
+def get_block2(size):
+    path = join("assets", "Terrain", "IndustrialTile_72.png")
+    image = pygame.image.load(path).convert_alpha()
+    surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
+    rect = pygame.Rect(0, 0, size, size)
+    surface.blit(image, (0,0), rect)
+    return pygame.transform.scale2x(surface)
+
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     GRAVITY = 1
@@ -171,24 +179,34 @@ class Block(Object):
         self.image.blit(block, (0, 0))
         self.mask = pygame.mask.from_surface(self.image)
 
+class Block2(Object):
+    def __init__(self, x, y, size):
+        super().__init__(x, y, size, size)
+        block = get_block2(size)
+        self.image.blit(block, (0, 0))
+        self.mask = pygame.mask.from_surface(self.image)
+
 class Enemy(Object):
-    ANIMATION_DELAY = 3
-    def __init__(self, x, y, width, height):
+    ANIMATION_DELAY = 4
+    def __init__(self, x, y, width, height, end):
+        self.vel = 2
+        self.x = x
+        self.y = y
+        self.path = [x, end]
+        
         super().__init__(x, y, width, height, "enemy")
-        self.enemy = load_sprite_sheets("Characters", "Enemy", width, height)
-        self.image = self.enemy["Punk_idle"][0]
+        self.ENEMY = load_sprite_sheets("Characters", "Enemy", 48, 48)
+        self.image = self.ENEMY["Punk_idle"][0]
+        self.direction = "left"
         self.mask = pygame.mask.from_surface(self.image)
         self.animation_count = 0
-        self.animation_name = "Punk_idle"
+        self.animation = "Punk_idle"
 
-    def walk(self):
-        self.animation_name = "Walk"
-
-    def idle(self):
-        self.animation_name = "Punk_idle"
-
+    def active(self):
+            pass
+        
     def loop(self):
-        sprites = self.enemy[self.animation_name]
+        sprites = self.ENEMY[self.animation]
         sprite_index = (self.animation_count // 
                         self.ANIMATION_DELAY) % len(sprites)
         self.image = sprites[sprite_index]
@@ -200,13 +218,15 @@ class Enemy(Object):
         if self.animation_count // self.ANIMATION_DELAY > len(sprites):
             self.animation_count = 0
 
-def draw(window, player, objects,offset_x):
+def draw(window, player, objects,offset_x, enemy):
     
 
     for obj in objects:
         obj.draw(window, offset_x)
 
     player.draw(window, offset_x)
+
+    enemy.draw(window, offset_x)
     
     pygame.display.update()
 
@@ -225,6 +245,19 @@ def handle_vertical_collison(player, objects, dy):
 
     return collided_objects
 
+def collide(player, objects, dx):
+    player.move(dx, 0)
+    player.update()
+    collided_object = None
+    for obj in objects:
+        if pygame.sprite.collide_mask(player, obj):
+            collided_object = obj
+            break
+    player.move(-dx, 0)
+    player.update()
+    return collided_object
+            
+
 def handle_move(player, objects, scroll):
     keys = pygame.key.get_pressed()
 
@@ -232,7 +265,7 @@ def handle_move(player, objects, scroll):
     if keys[pygame.K_a] and player.rect.x > 0:
         player.move_left(PLAYER_VEL)
         scroll -= 5
-    elif keys[pygame.K_d] and player.rect.x < 3000:
+    elif keys[pygame.K_d] and player.rect.x < 1500:
         player.move_right(PLAYER_VEL)
         scroll += 5
         
@@ -263,14 +296,24 @@ def main(window):
 
     floor_level = 100
 
+    enemy_pos = HEIGHT - floor_level - 96
+
 
     player = Player(WIDTH / 2, HEIGHT - floor_level - 2, 48, 48)
-    enemy = Enemy(100, HEIGHT - floor_level - 98 - 2, 48, 48)
-    enemy.idle()
+    enemy = Enemy(100, enemy_pos, 48, 48, 450)
+    enemy.active()
     floor = [Block(i * block_size, HEIGHT - floor_level, block_size)
               for i in range(1000)]
+    floor2 = [Block2((i * block_size) + 80, HEIGHT - floor_level * 2.5, block_size)
+              for i in range(10)] 
+    floor3 = [Block2((i * block_size) + 420, HEIGHT - floor_level * 4, block_size)
+              for i in range(15)]
+    floor4 = [Block2((i * block_size) + 1000, HEIGHT - floor_level * 4, block_size)
+              for i in range(10)]
+    floor5 = [Block2((i * block_size) + 1400, HEIGHT - floor_level * 3, block_size)
+              for i in range(10)] 
     
-    objects = [*floor, enemy]
+    objects = [*floor, *floor2, *floor3, *floor4, *floor5]
     
     offset_x = 0
     scroll_area_width = 10
@@ -293,9 +336,9 @@ def main(window):
         player.loop(FPS)
         enemy.loop()
         handle_move(player, objects, scroll)
-        draw(window, player, objects, offset_x)
+        draw(window, player, objects, offset_x, enemy)
 
-        if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0 and scroll < 3000):
+        if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0 and scroll < 1500):
             offset_x += player.x_vel
             scroll += 2
         elif ((player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0 and scroll > 0):
