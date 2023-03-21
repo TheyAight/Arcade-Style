@@ -1,5 +1,6 @@
 import pygame, random, math, os
 from os import listdir
+import time
 from os.path import isfile, join
 from pygame import mixer
 pygame.init()
@@ -54,7 +55,7 @@ def get_block(size):
     return pygame.transform.scale2x(surface)
 
 def get_block2(size):
-    path = join("assets", "Terrain", "IndustrialTile_72.png")
+    path = join("assets", "Terrain", "IndustrialTile_14.png")
     image = pygame.image.load(path).convert_alpha()
     surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
     rect = pygame.Rect(0, 0, size, size)
@@ -77,6 +78,8 @@ class Player(pygame.sprite.Sprite):
         self.animation_count = 0
         self.fall_count = 0
         self.jump_count = 0
+        self.hit = False
+        self.hit_count = 0
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -89,6 +92,10 @@ class Player(pygame.sprite.Sprite):
     def move(self, dx, dy):
         self.rect.x += dx
         self.rect.y += dy
+
+    def make_hit(self):
+        self.hit = True
+        self.hit_count = 0
 
     def move_left(self, vel):
         self.x_vel = -vel
@@ -106,6 +113,11 @@ class Player(pygame.sprite.Sprite):
         self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
         self.move(self.x_vel, self.y_vel)
 
+        if self.hit:
+            self.hit_count += 1
+        if self.hit_count > fps * 2:
+            self.hit = False
+
         self.fall_count += 1
         self.update_sprite()
 
@@ -122,6 +134,8 @@ class Player(pygame.sprite.Sprite):
     def update_sprite(self):
         keys = pygame.key.get_pressed()
         sprite_sheet = "Cyborg_idle"
+        if self.hit:
+            sprite_sheet = "Cyborg_hurt"
         if self.y_vel < 0:
             if self.jump_count == 1:
                 sprite_sheet = "Cyborg_jump" 
@@ -185,38 +199,85 @@ class Block2(Object):
         block = get_block2(size)
         self.image.blit(block, (0, 0))
         self.mask = pygame.mask.from_surface(self.image)
+class Truck(Object):
+    ANIMATION_DELAY = 3
 
-class Enemy(Object):
-    ANIMATION_DELAY = 4
-    def __init__(self, x, y, width, height, end):
-        self.vel = 2
-        self.x = x
-        self.y = y
-        self.path = [x, end]
-        
-        super().__init__(x, y, width, height, "enemy")
-        self.ENEMY = load_sprite_sheets("Characters", "Enemy", 48, 48)
-        self.image = self.ENEMY["Punk_idle"][0]
-        self.direction = "left"
-        self.mask = pygame.mask.from_surface(self.image)
-        self.animation_count = 0
-        self.animation = "Punk_idle"
+    def __init__(self, x, y, width, height):
+            super().__init__(x, y, width, height, "truck")
+            self.truck = load_sprite_sheets("Terrain", "TacoStand", width, height)
+            self.image = self.truck["idle"][0]
+            self.mask = pygame.mask.from_surface(self.image)
+            self.animation_count = 0 
+            self.animation_name = "idle"
+            
+    def idle(self):
+        self.animation_name = "idle"
 
-    def active(self):
-            pass
-        
     def loop(self):
-        sprites = self.ENEMY[self.animation]
+        sprites = self.truck[self.animation_name]
         sprite_index = (self.animation_count // 
                         self.ANIMATION_DELAY) % len(sprites)
         self.image = sprites[sprite_index]
         self.animation_count += 1
 
-        self.rect = self.image.get_rect(topleft=(self.rect.x, self.rect.y))
-        self.mask = pygame.mask.from_surface(self.image)
+        self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
+        self.mask = pygame.mask.from_surface(self.sprite)
 
         if self.animation_count // self.ANIMATION_DELAY > len(sprites):
             self.animation_count = 0
+
+
+class Enemy(pygame.sprite.Sprite):
+    COLOR = (255, 0, 0)
+    SPRITES = load_sprite_sheets("Characters", "Enemy", 48, 48, True)
+    ANIMATION_DELAY = 5
+
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.x_vel = 0
+        self.y_vel = 0
+        self.mask = None
+        self.direction = "right"
+        self.animation_count = 0
+
+    def move(self, dx):
+        self.rect.x += dx
+
+    def move_left(self, vel):
+        self.x_vel = -vel
+        if self.direction != "left":
+            self.direction = "left"
+            self.animation_count = 0
+
+
+    def move_right(self, vel):
+        self.x_vel = vel
+        if self.direction != "right":
+            self.direction = "right"
+            self.animation_count = 0
+    
+    def loop(self, fps):
+        self.move(self.x_vel)
+        
+        self.update_sprite()
+
+    def update_sprite(self):
+        image = "Punk_idle"
+
+        if self.x_vel != 0:
+            image = "Walk_attack"
+
+        sprite_sheet_name = image + "_" + self.direction
+        sprites = self.SPRITES[sprite_sheet_name]
+        sprite_index = (self.animation_count // 
+                        self.ANIMATION_DELAY) % len(sprites)
+        self.sprite = sprites[sprite_index]
+        self.animation_count += 1
+        self.update()
+
+    def draw(self, win):
+        win.blit(self.sprite, (self.rect.x, self.rect.y))
+    
 
 def draw(window, player, objects,offset_x, enemy):
     
@@ -226,7 +287,7 @@ def draw(window, player, objects,offset_x, enemy):
 
     player.draw(window, offset_x)
 
-    enemy.draw(window, offset_x)
+    enemy.draw(window)
     
     pygame.display.update()
 
@@ -245,7 +306,7 @@ def handle_vertical_collison(player, objects, dy):
 
     return collided_objects
 
-def collide(player, objects, dx):
+def collide(player,enemy, objects, dx):
     player.move(dx, 0)
     player.update()
     collided_object = None
@@ -253,23 +314,35 @@ def collide(player, objects, dx):
         if pygame.sprite.collide_mask(player, obj):
             collided_object = obj
             break
+    if pygame.sprite.collide_mask(player, enemy):
+        collided_object = enemy
     player.move(-dx, 0)
     player.update()
     return collided_object
             
 
-def handle_move(player, objects, scroll):
+def handle_move(player, enemy, objects, scroll):
     keys = pygame.key.get_pressed()
 
     player.x_vel = 0
     if keys[pygame.K_a] and player.rect.x > 0:
         player.move_left(PLAYER_VEL)
         scroll -= 5
-    elif keys[pygame.K_d] and player.rect.x < 1500:
+    elif keys[pygame.K_d] and player.rect.x < 1400:
         player.move_right(PLAYER_VEL)
         scroll += 5
-        
 
+    
+    ENEMY_VEL = 3
+    if enemy.rect.x < -10:
+        enemy.move_right(ENEMY_VEL)
+    elif enemy.rect.x > 1300:
+        enemy.move_left(ENEMY_VEL)
+
+
+
+
+        
     handle_vertical_collison(player, objects, player.y_vel)
 
 
@@ -300,20 +373,19 @@ def main(window):
 
 
     player = Player(WIDTH / 2, HEIGHT - floor_level - 2, 48, 48)
-    enemy = Enemy(100, enemy_pos, 48, 48, 450)
-    enemy.active()
+    enemy = Enemy(-12, enemy_pos, 48, 48)
     floor = [Block(i * block_size, HEIGHT - floor_level, block_size)
-              for i in range(1000)]
-    floor2 = [Block2((i * block_size) + 80, HEIGHT - floor_level * 2.5, block_size)
-              for i in range(10)] 
-    floor3 = [Block2((i * block_size) + 420, HEIGHT - floor_level * 4, block_size)
-              for i in range(15)]
-    floor4 = [Block2((i * block_size) + 1000, HEIGHT - floor_level * 4, block_size)
-              for i in range(10)]
-    floor5 = [Block2((i * block_size) + 1400, HEIGHT - floor_level * 3, block_size)
-              for i in range(10)] 
+              for i in range(400)]
+    floor2 = [Block2((i * block_size), HEIGHT - 70, block_size)
+              for i in range(400)] 
+    floor3 = [Block2((i * block_size) - 50, HEIGHT - 40, block_size)
+              for i in range(400)] 
+    floor4 = [Block2((i * block_size), HEIGHT - 10, block_size)
+              for i in range(400)] 
+    truck = Truck(100, HEIGHT - 280, 96, 192)
+    truck.idle()
     
-    objects = [*floor, *floor2, *floor3, *floor4, *floor5]
+    objects = [*floor, *floor2, *floor3, *floor4]
     
     offset_x = 0
     scroll_area_width = 10
@@ -334,8 +406,8 @@ def main(window):
                     player.jump()
 
         player.loop(FPS)
-        enemy.loop()
-        handle_move(player, objects, scroll)
+        enemy.loop(FPS)
+        handle_move(player, enemy, objects, scroll)
         draw(window, player, objects, offset_x, enemy)
 
         if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0 and scroll < 1500):
