@@ -62,6 +62,14 @@ def get_block2(size):
     surface.blit(image, (0,0), rect)
     return pygame.transform.scale2x(surface)
 
+def get_block3(size):
+    path = join("assets", "Objects", "pad.png")
+    image = pygame.image.load(path).convert_alpha()
+    surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
+    rect = pygame.Rect(0, 0, size, size)
+    surface.blit(image, (0,0), rect)
+    return pygame.transform.scale2x(surface)
+
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     GRAVITY = 1
@@ -71,6 +79,7 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
+        self.radius = 25
         self.x_vel = 0
         self.y_vel = 0
         self.mask = None
@@ -80,6 +89,28 @@ class Player(pygame.sprite.Sprite):
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
+        self.health = 600 #600 because the fps is 60
+        self.maximum_health = 600
+        self.health_bar_length = 400
+        self.health_ratio = self.maximum_health / self.health_bar_length
+
+    def basic_health(self):
+        pygame.draw.rect(window, (0,234,76),(10,10,self.health / self.health_ratio, 25))
+        pygame.draw.rect(window, (0,0,0),(10,10,self.health_bar_length, 25), 4)
+
+    def get_damage(self,amount):
+        if self.health > 0:
+            self.health -= amount
+            self.hit = True
+            self.hit_count = 0
+        if self.health <= 0:
+            self.health = 0
+
+    def get_health(self, amount):
+        if self.health < self.maximum_health:
+            self.health += amount
+        if self.health >= self.maximum_health:
+            self.health = self.maximum_health
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -92,10 +123,6 @@ class Player(pygame.sprite.Sprite):
     def move(self, dx, dy):
         self.rect.x += dx
         self.rect.y += dy
-
-    def make_hit(self):
-        self.hit = True
-        self.hit_count = 0
 
     def move_left(self, vel):
         self.x_vel = -vel
@@ -115,7 +142,7 @@ class Player(pygame.sprite.Sprite):
 
         if self.hit:
             self.hit_count += 1
-        if self.hit_count > fps * 2:
+        if self.hit_count > fps * .3:
             self.hit = False
 
         self.fall_count += 1
@@ -130,12 +157,19 @@ class Player(pygame.sprite.Sprite):
         self.count = 0
         self.y_vel *= 1
     
-
+    def create_bullet(self):
+        if self.direction == "right":
+            return Bullet(self.rect.x + 75, self.rect.y + 43, self.direction)
+        else:
+            return Bullet(self.rect.x + 30, self.rect.y + 43, self.direction)
+        
     def update_sprite(self):
         keys = pygame.key.get_pressed()
         sprite_sheet = "Cyborg_idle"
         if self.hit:
             sprite_sheet = "Cyborg_hurt"
+            if self.health > 0:
+                self.health -= 1
         if self.y_vel < 0:
             if self.jump_count == 1:
                 sprite_sheet = "Cyborg_jump" 
@@ -151,14 +185,9 @@ class Player(pygame.sprite.Sprite):
             sprite_sheet = "Fall"
         elif self.x_vel != 0:
             sprite_sheet = "Cyborg_run"
-        elif keys [pygame.K_9]:
-            sprite_sheet = "Angry"
-        elif keys [pygame.K_k]:
-            sprite_sheet = "Cyborg_punch"
-        elif keys [pygame.K_j]:
-            sprite_sheet = "Cyborg_attack3"
-        
-
+        elif keys [pygame.K_SPACE]:
+            sprite_sheet = "shoot"
+            
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
         sprite_index = (self.animation_count // 
@@ -170,9 +199,28 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
         self.mask = pygame.mask.from_surface(self.sprite)
+        self.basic_health()
     
     def draw(self, win, offset_x):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
+
+
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self,pos_x,pos_y, name):
+        super().__init__()
+        self.image = pygame.image.load("assets/Objects/7_1.png")
+        self.image.fill((225,0,0))
+        self.rect = self.image.get_rect(center = (pos_x,pos_y))
+        self.direction = name
+
+    def update(self):
+        if self.direction == "right":
+            self.rect.x += 10
+        elif self.direction == "left":
+            self.rect.x -= 10
+            
+        if self.rect.x >= WIDTH + 200:
+            self.kill()
 
 class Object(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, name=None):
@@ -199,32 +247,13 @@ class Block2(Object):
         block = get_block2(size)
         self.image.blit(block, (0, 0))
         self.mask = pygame.mask.from_surface(self.image)
-class Truck(Object):
-    ANIMATION_DELAY = 3
 
-    def __init__(self, x, y, width, height):
-            super().__init__(x, y, width, height, "truck")
-            self.truck = load_sprite_sheets("Terrain", "TacoStand", width, height)
-            self.image = self.truck["idle"][0]
-            self.mask = pygame.mask.from_surface(self.image)
-            self.animation_count = 0 
-            self.animation_name = "idle"
-            
-    def idle(self):
-        self.animation_name = "idle"
-
-    def loop(self):
-        sprites = self.truck[self.animation_name]
-        sprite_index = (self.animation_count // 
-                        self.ANIMATION_DELAY) % len(sprites)
-        self.image = sprites[sprite_index]
-        self.animation_count += 1
-
-        self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
-        self.mask = pygame.mask.from_surface(self.sprite)
-
-        if self.animation_count // self.ANIMATION_DELAY > len(sprites):
-            self.animation_count = 0
+class Block3(Object):
+    def __init__(self, x, y, size):
+        super().__init__(x, y, size, size)
+        block = get_block3(size)
+        self.image.blit(block, (0, 0))
+        self.mask = pygame.mask.from_surface(self.image)
 
 
 class Enemy(pygame.sprite.Sprite):
@@ -233,15 +262,32 @@ class Enemy(pygame.sprite.Sprite):
     ANIMATION_DELAY = 5
 
     def __init__(self, x, y, width, height):
+        super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
         self.y_vel = 0
         self.mask = None
         self.direction = "right"
         self.animation_count = 0
+        self.health = 120
+        self.hit = False
+        self.hit_count = 0
+        self.life = True
+        self.deathani = 0
+
+    def get_damage(self,amount):
+        if self.health > 0:
+            self.health -= amount
+            self.hit = True
+            self.hit_count = 0
+        if self.health <= 0:
+            self.health = 0
 
     def move(self, dx):
-        self.rect.x += dx
+        if self.health > 0:
+            self.rect.x += dx
+        else:
+            self.rect.x = self.rect.x
 
     def move_left(self, vel):
         self.x_vel = -vel
@@ -258,14 +304,32 @@ class Enemy(pygame.sprite.Sprite):
     
     def loop(self, fps):
         self.move(self.x_vel)
+
+        if self.hit:
+            self.hit_count += 1
+        if self.hit_count > fps * .3:
+            self.hit = False
         
+        if self.health <= 0:
+            self.deathani += 1
+        if self.deathani > fps * .46:
+            self.life = False
+
         self.update_sprite()
 
-    def update_sprite(self):
-        image = "Punk_idle"
 
-        if self.x_vel != 0:
-            image = "Walk_attack"
+    def update_sprite(self):
+        image = "Walk_attack"
+
+        it = 0
+
+        if self.hit:
+            image = "Punk_hurt"
+            if self.health > 0:
+                self.health -= 1
+        elif self.health <= 0:
+            image = "Punk_death"
+        
 
         sprite_sheet_name = image + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
@@ -275,19 +339,24 @@ class Enemy(pygame.sprite.Sprite):
         self.animation_count += 1
         self.update()
 
-    def draw(self, win):
-        win.blit(self.sprite, (self.rect.x, self.rect.y))
-    
+    def update(self):
+        self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
+        self.mask = pygame.mask.from_surface(self.sprite)
 
-def draw(window, player, objects,offset_x, enemy):
+    def draw(self, win, offset_x):
+        win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
+    
+def draw(window, player, objects,offset_x, enemy, health):
     
 
     for obj in objects:
         obj.draw(window, offset_x)
 
+    health.draw(window, offset_x)
+
     player.draw(window, offset_x)
 
-    enemy.draw(window)
+    enemy.draw(window, offset_x)
     
     pygame.display.update()
 
@@ -306,7 +375,7 @@ def handle_vertical_collison(player, objects, dy):
 
     return collided_objects
 
-def collide(player,enemy, objects, dx):
+def collide(player, objects, dx):
     player.move(dx, 0)
     player.update()
     collided_object = None
@@ -314,15 +383,13 @@ def collide(player,enemy, objects, dx):
         if pygame.sprite.collide_mask(player, obj):
             collided_object = obj
             break
-    if pygame.sprite.collide_mask(player, enemy):
-        collided_object = enemy
     player.move(-dx, 0)
     player.update()
     return collided_object
             
-
 def handle_move(player, enemy, objects, scroll):
     keys = pygame.key.get_pressed()
+
 
     player.x_vel = 0
     if keys[pygame.K_a] and player.rect.x > 0:
@@ -336,9 +403,8 @@ def handle_move(player, enemy, objects, scroll):
     ENEMY_VEL = 3
     if enemy.rect.x < -10:
         enemy.move_right(ENEMY_VEL)
-    elif enemy.rect.x > 1300:
+    elif enemy.rect.x > 1260:
         enemy.move_left(ENEMY_VEL)
-
 
 
 
@@ -369,9 +435,12 @@ def main(window):
 
     floor_level = 100
 
+    bullet_group = pygame.sprite.Group()
+    bullet = bullet_group
+
     enemy_pos = HEIGHT - floor_level - 96
 
-
+    health = Block3(100,HEIGHT - floor_level - 178 , 192)
     player = Player(WIDTH / 2, HEIGHT - floor_level - 2, 48, 48)
     enemy = Enemy(-12, enemy_pos, 48, 48)
     floor = [Block(i * block_size, HEIGHT - floor_level, block_size)
@@ -382,10 +451,8 @@ def main(window):
               for i in range(400)] 
     floor4 = [Block2((i * block_size), HEIGHT - 10, block_size)
               for i in range(400)] 
-    truck = Truck(100, HEIGHT - 280, 96, 192)
-    truck.idle()
     
-    objects = [*floor, *floor2, *floor3, *floor4]
+    objects = [ *floor, *floor2, *floor3, *floor4]
     
     offset_x = 0
     scroll_area_width = 10
@@ -395,7 +462,16 @@ def main(window):
         clock.tick(FPS)
 
         draw_bg()
-        
+
+        if pygame.sprite.collide_rect(enemy, player):
+                player.get_damage(.5)
+        elif pygame.sprite.collide_rect(health, player):
+                player.get_health(1)
+        elif pygame.sprite.spritecollideany(enemy, bullet):
+                enemy.get_damage(20)
+                for b in bullet:
+                    b.kill()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
@@ -404,11 +480,17 @@ def main(window):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_w and player.jump_count < 2:
                     player.jump()
+                elif event.key == pygame.K_SPACE:
+                    bullet_group.add(player.create_bullet())
+
+                
 
         player.loop(FPS)
         enemy.loop(FPS)
         handle_move(player, enemy, objects, scroll)
-        draw(window, player, objects, offset_x, enemy)
+        bullet.draw(window)
+        bullet_group.update()
+        draw(window, player, objects, offset_x, enemy, health)
 
         if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0 and scroll < 1500):
             offset_x += player.x_vel
@@ -416,6 +498,10 @@ def main(window):
         elif ((player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0 and scroll > 0):
             offset_x += player.x_vel
             scroll -= 2
+
+        if player.health == 0:
+            break
+
 
     pygame.quit()
     quit()
