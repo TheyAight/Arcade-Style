@@ -16,6 +16,7 @@ BG_COLOR = (255, 255, 255)
 
 FPS = 60 
 PLAYER_VEL = 6
+ENEMY_VEL = 3
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -163,6 +164,9 @@ class Player(pygame.sprite.Sprite):
         else:
             return Bullet(self.rect.x + 30, self.rect.y + 43, self.direction)
         
+    def create_enemy(self):
+        return Enemy(-12, HEIGHT - 196, 48, 48)
+        
     def update_sprite(self):
         keys = pygame.key.get_pressed()
         sprite_sheet = "Cyborg_idle"
@@ -185,8 +189,11 @@ class Player(pygame.sprite.Sprite):
             sprite_sheet = "Fall"
         elif self.x_vel != 0:
             sprite_sheet = "Cyborg_run"
-        elif keys [pygame.K_SPACE]:
+        elif keys [pygame.K_SPACE] and not self.hit:
             sprite_sheet = "shoot"
+            path = join('assets', 'SFX', 'cannon_x.wav')
+            impact = mixer.Sound(path)
+            impact.play()
             
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
@@ -262,6 +269,7 @@ class Enemy(pygame.sprite.Sprite):
     ANIMATION_DELAY = 5
 
     def __init__(self, x, y, width, height):
+        
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
@@ -269,11 +277,12 @@ class Enemy(pygame.sprite.Sprite):
         self.mask = None
         self.direction = "right"
         self.animation_count = 0
-        self.health = 120
+        self.health = 60
         self.hit = False
         self.hit_count = 0
         self.life = True
         self.deathani = 0
+        self.image = pygame.image.load("assets/Objects/blankimage.png")
 
     def get_damage(self,amount):
         if self.health > 0:
@@ -302,61 +311,49 @@ class Enemy(pygame.sprite.Sprite):
             self.direction = "right"
             self.animation_count = 0
     
-    def loop(self, fps):
+    def update(self, win, offset_x):
         self.move(self.x_vel)
+
+        if self.rect.x < -10:
+            self.move_right(ENEMY_VEL)
+        elif self.rect.x > 1260:
+            self.move_left(ENEMY_VEL)
 
         if self.hit:
             self.hit_count += 1
-        if self.hit_count > fps * .3:
+        if self.hit_count > 60 * .3:
             self.hit = False
         
-        if self.health <= 0:
-            self.deathani += 1
-        if self.deathani > fps * .46:
-            self.life = False
-
-        self.update_sprite()
-
-
-    def update_sprite(self):
         image = "Walk_attack"
 
-        it = 0
-
-        if self.hit:
+        if self.hit and not self.health <= 0:
             image = "Punk_hurt"
-            if self.health > 0:
-                self.health -= 1
         elif self.health <= 0:
-            image = "Punk_death"
-        
+            image = "death"
 
+        
         sprite_sheet_name = image + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
         sprite_index = (self.animation_count // 
                         self.ANIMATION_DELAY) % len(sprites)
         self.sprite = sprites[sprite_index]
         self.animation_count += 1
-        self.update()
 
-    def update(self):
-        self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
-        self.mask = pygame.mask.from_surface(self.sprite)
+        if self.health <= 0:
+            if sprite_index == 6:
+                self.kill()
 
-    def draw(self, win, offset_x):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
+
+        
     
-def draw(window, player, objects,offset_x, enemy, health):
+def draw(window, player, objects,offset_x):
     
 
     for obj in objects:
         obj.draw(window, offset_x)
 
-    health.draw(window, offset_x)
-
     player.draw(window, offset_x)
-
-    enemy.draw(window, offset_x)
     
     pygame.display.update()
 
@@ -387,24 +384,15 @@ def collide(player, objects, dx):
     player.update()
     return collided_object
             
-def handle_move(player, enemy, objects, scroll):
+def handle_move(player, objects):
     keys = pygame.key.get_pressed()
 
 
     player.x_vel = 0
     if keys[pygame.K_a] and player.rect.x > 0:
         player.move_left(PLAYER_VEL)
-        scroll -= 5
-    elif keys[pygame.K_d] and player.rect.x < 1400:
+    elif keys[pygame.K_d] and player.rect.x < 1250:
         player.move_right(PLAYER_VEL)
-        scroll += 5
-
-    
-    ENEMY_VEL = 3
-    if enemy.rect.x < -10:
-        enemy.move_right(ENEMY_VEL)
-    elif enemy.rect.x > 1260:
-        enemy.move_left(ENEMY_VEL)
 
 
 
@@ -438,11 +426,10 @@ def main(window):
     bullet_group = pygame.sprite.Group()
     bullet = bullet_group
 
-    enemy_pos = HEIGHT - floor_level - 96
+    enemy_group = pygame.sprite.Group()
+    enemies = enemy_group
 
-    health = Block3(100,HEIGHT - floor_level - 178 , 192)
     player = Player(WIDTH / 2, HEIGHT - floor_level - 2, 48, 48)
-    enemy = Enemy(-12, enemy_pos, 48, 48)
     floor = [Block(i * block_size, HEIGHT - floor_level, block_size)
               for i in range(400)]
     floor2 = [Block2((i * block_size), HEIGHT - 70, block_size)
@@ -455,22 +442,23 @@ def main(window):
     objects = [ *floor, *floor2, *floor3, *floor4]
     
     offset_x = 0
-    scroll_area_width = 10
 
     run = True
     while run:
         clock.tick(FPS)
 
         draw_bg()
-
-        if pygame.sprite.collide_rect(enemy, player):
-                player.get_damage(.5)
-        elif pygame.sprite.collide_rect(health, player):
-                player.get_health(1)
-        elif pygame.sprite.spritecollideany(enemy, bullet):
-                enemy.get_damage(20)
-                for b in bullet:
+        
+        for e in enemies:
+            if pygame.sprite.spritecollideany(e , bullet):
+                if e.health > 0:
+                    e.get_damage(20)
+        for b in bullet:
+            if pygame.sprite.spritecollideany(b , enemies):
                     b.kill()
+        if pygame.sprite.spritecollideany(player, enemies):
+            player.get_damage(.003)
+            
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -480,24 +468,20 @@ def main(window):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_w and player.jump_count < 2:
                     player.jump()
-                elif event.key == pygame.K_SPACE:
+                elif event.key == pygame.K_SPACE and player.x_vel == 0 and not player.hit:
                     bullet_group.add(player.create_bullet())
+                elif event.key == pygame.K_UP:
+                    enemy_group.add(player.create_enemy())
 
                 
-
+        
         player.loop(FPS)
-        enemy.loop(FPS)
-        handle_move(player, enemy, objects, scroll)
+        handle_move(player, objects)
         bullet.draw(window)
         bullet_group.update()
-        draw(window, player, objects, offset_x, enemy, health)
-
-        if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0 and scroll < 1500):
-            offset_x += player.x_vel
-            scroll += 2
-        elif ((player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0 and scroll > 0):
-            offset_x += player.x_vel
-            scroll -= 2
+        enemies.draw(window)
+        enemy_group.update(window, offset_x)
+        draw(window, player, objects, offset_x)
 
         if player.health == 0:
             break
