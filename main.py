@@ -7,16 +7,18 @@ pygame.init()
 
 WIDTH, HEIGHT = 1324, 745
 
-pygame.display.set_caption("LEG DAY")
+pygame.display.set_caption("Arcade Style")
 
 mixer.music.load('assets/Music/bgmusic.mp3')
 mixer.music.play(-1)
 
+smallfont = pygame.font.SysFont("comicsansms", 25)
+
 BG_COLOR = (255, 255, 255)
 
 FPS = 60 
-PLAYER_VEL = 6
-ENEMY_VEL = 3
+PLAYER_VEL = 8
+ENEMY_VEL = 2
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -94,6 +96,7 @@ class Player(pygame.sprite.Sprite):
         self.maximum_health = 600
         self.health_bar_length = 400
         self.health_ratio = self.maximum_health / self.health_bar_length
+        self.score = 0
 
     def basic_health(self):
         pygame.draw.rect(window, (0,234,76),(10,10,self.health / self.health_ratio, 25))
@@ -165,7 +168,8 @@ class Player(pygame.sprite.Sprite):
             return Bullet(self.rect.x + 30, self.rect.y + 43, self.direction)
         
     def create_enemy(self):
-        return Enemy(-12, HEIGHT - 196, 48, 48)
+        x_placement = random.randint(20, 1260)
+        return Enemy(x_placement, HEIGHT - 196, 48, 48)
         
     def update_sprite(self):
         keys = pygame.key.get_pressed()
@@ -191,9 +195,6 @@ class Player(pygame.sprite.Sprite):
             sprite_sheet = "Cyborg_run"
         elif keys [pygame.K_SPACE] and not self.hit:
             sprite_sheet = "shoot"
-            path = join('assets', 'SFX', 'cannon_x.wav')
-            impact = mixer.Sound(path)
-            impact.play()
             
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
@@ -311,13 +312,17 @@ class Enemy(pygame.sprite.Sprite):
             self.direction = "right"
             self.animation_count = 0
     
-    def update(self, win, offset_x):
+    def update(self, win, offset_x, player):
         self.move(self.x_vel)
 
-        if self.rect.x < -10:
+        if self.rect.x < -10 or self.rect.x < player.rect.x:
             self.move_right(ENEMY_VEL)
-        elif self.rect.x > 1260:
+        elif self.rect.x > 1260 or self.rect.x > player.rect.x:
             self.move_left(ENEMY_VEL)
+        elif self.rect.x == player.rect.x and self.direction == 'right' and player.hit:
+            self.rect.x = self.rect.x -70
+        elif self.rect.x == player.rect.x and self.direction == 'left' and player.hit:
+            self.rect.x = self.rect.x + 70
 
         if self.hit:
             self.hit_count += 1
@@ -341,12 +346,19 @@ class Enemy(pygame.sprite.Sprite):
 
         if self.health <= 0:
             if sprite_index == 6:
+                player.score += 2
                 self.kill()
 
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
 
-        
-    
+def score(score, win):
+    text = smallfont.render("Score: "+str(score), True, BG_COLOR)
+    win.blit(text, [10, 50])
+
+def end_score(score, win):
+    text = smallfont.render("Score: "+str(score), True, (0, 0, 0))
+    win.blit(text, [600, 600])
+
 def draw(window, player, objects,offset_x):
     
 
@@ -354,6 +366,8 @@ def draw(window, player, objects,offset_x):
         obj.draw(window, offset_x)
 
     player.draw(window, offset_x)
+
+    score(player.score, window)
     
     pygame.display.update()
 
@@ -400,7 +414,7 @@ def handle_move(player, objects):
     handle_vertical_collison(player, objects, player.y_vel)
 
 
-def main(window):
+def play(window):
     clock = pygame.time.Clock()
 
     scroll = 0
@@ -443,6 +457,14 @@ def main(window):
     
     offset_x = 0
 
+    enemy_delay = 4000 # 4 seconds
+    enemy_event = pygame.USEREVENT + 1
+    pygame.time.set_timer(enemy_event, enemy_delay)
+
+    player_delay = 30000 # 30 seconds
+    player_event = pygame.USEREVENT + 2
+    pygame.time.set_timer(player_event, player_delay)
+
     run = True
     while run:
         clock.tick(FPS)
@@ -456,7 +478,7 @@ def main(window):
         for b in bullet:
             if pygame.sprite.spritecollideany(b , enemies):
                     b.kill()
-        if pygame.sprite.spritecollideany(player, enemies):
+        if pygame.sprite.spritecollideany(player, enemies) and player.y_vel == 0:
             player.get_damage(.003)
             
 
@@ -470,25 +492,99 @@ def main(window):
                     player.jump()
                 elif event.key == pygame.K_SPACE and player.x_vel == 0 and not player.hit:
                     bullet_group.add(player.create_bullet())
-                elif event.key == pygame.K_UP:
-                    enemy_group.add(player.create_enemy())
+                    path = join('assets', 'SFX', 'cannon_x.wav')
+                    impact = mixer.Sound(path)
+                    impact.play()
+            if event.type == enemy_event:
+                enemy_group.add(player.create_enemy())
+                enemy_group.add(player.create_enemy())
+            if event.type == player_event:
+                player.score += 8
+                if player.health < player.maximum_health:
+                    player.health += 20
 
                 
-        
+        if player.health == 0:
+            end_menu(window, player)
+            run = False
+
         player.loop(FPS)
         handle_move(player, objects)
         bullet.draw(window)
         bullet_group.update()
         enemies.draw(window)
-        enemy_group.update(window, offset_x)
+        enemy_group.update(window, offset_x, player)
         draw(window, player, objects, offset_x)
-
-        if player.health == 0:
-            break
 
 
     pygame.quit()
     quit()
 
-if __name__ == "__main__":
-    main(window)
+def end_menu(window, player):
+
+    end_src = pygame.image.load("assets\Background\endscreen.png").convert_alpha()
+
+    def draw_end():
+        
+        window.blit(end_src, (0,0))
+
+    run = True
+    while run:
+
+        window.fill((225, 0, 0))
+
+        draw_end()
+
+        end_score(player.score, window)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                break
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_q:
+                    run = False
+                    break
+            
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    play(window)
+                    run = False
+
+        pygame.display.update()
+
+    pygame.quit()
+    quit()
+
+def main_menu(window):
+
+    menu_scr = pygame.image.load("assets\Background\Mainmenu.png").convert_alpha()
+
+    def draw_menu():
+        window.blit(menu_scr, (0, 0))
+
+    
+
+    run = True
+    while run:
+        window.fill((225, 0, 0))
+
+        draw_menu()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                break
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    play(window)
+                    run = False
+
+        pygame.display.update()
+
+    pygame.quit()
+    quit()
+
+main_menu(window)
