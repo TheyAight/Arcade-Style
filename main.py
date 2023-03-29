@@ -9,7 +9,7 @@ WIDTH, HEIGHT = 1324, 745
 
 pygame.display.set_caption("Arcade Style")
 
-mixer.music.load('assets/Music/bgmusic.mp3')
+mixer.music.load("assets/Music/bgmusic.mp3")
 mixer.music.play(-1)
 
 smallfont = pygame.font.SysFont("comicsansms", 25)
@@ -59,14 +59,6 @@ def get_block(size):
 
 def get_block2(size):
     path = join("assets", "Terrain", "IndustrialTile_14.png")
-    image = pygame.image.load(path).convert_alpha()
-    surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
-    rect = pygame.Rect(0, 0, size, size)
-    surface.blit(image, (0,0), rect)
-    return pygame.transform.scale2x(surface)
-
-def get_block3(size):
-    path = join("assets", "Objects", "pad.png")
     image = pygame.image.load(path).convert_alpha()
     surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
     rect = pygame.Rect(0, 0, size, size)
@@ -253,13 +245,6 @@ class Block2(Object):
     def __init__(self, x, y, size):
         super().__init__(x, y, size, size)
         block = get_block2(size)
-        self.image.blit(block, (0, 0))
-        self.mask = pygame.mask.from_surface(self.image)
-
-class Block3(Object):
-    def __init__(self, x, y, size):
-        super().__init__(x, y, size, size)
-        block = get_block3(size)
         self.image.blit(block, (0, 0))
         self.mask = pygame.mask.from_surface(self.image)
 
